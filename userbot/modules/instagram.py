@@ -11,9 +11,6 @@ from telethon.errors.rpcerrorlist import YouBlockedUserError
 from userbot.events import register
 from userbot import bot, CMD_HELP
 
-# Feri Gans
-# Feri Gansssss Bangettttt
-
 
 @register(outgoing=True, pattern="^.ig ?(.*)")
 async def insta(event):
@@ -58,7 +55,5 @@ async def insta(event):
             await event.delete()
 
 
-# Linux - Userbot
-# Feri
 CMD_HELP.update({"instagram": "**Modules:** __Instagram__\n\n🐧CMD🐧: `.ig`"
                  "\n**Penjelasan:** Download Media di Postingan Instagram, Balas ke link instagram ketik `.ig`"})
