@@ -1,199 +1,225 @@
 # Copyright (C) 2019 The Raphielscape Company LLC.
 #
-# Licensed under the Raphielscape Public License, Version 1.c (the "License");
+# Licensed under the Raphielscape Public License, Version 1.d (the "License");
 # you may not use this file except in compliance with the License.
 #
-""" Userbot module for executing code and terminal commands from Telegram. """
+"""Userbot module for executing code and terminal commands from Telegram."""
 
 import asyncio
-import io
-import re
 import sys
-import traceback
-from getpass import getuser
+from io import StringIO
 from os import remove
-from sys import executable
+from traceback import format_exc
 
-from userbot import CMD_HELP, TERM_ALIAS
+from userbot import CMD_HELP, bot
 from userbot.events import register
+
+MAX_MESSAGE_SIZE_LIMIT = 4095
 
 
 @register(outgoing=True, pattern=r"^\.eval(?: |$|\n)([\s\S]*)")
-async def _(event):
-    if event.fwd_from:
-        return
-    s_m_ = await event.edit("Processing ...")
-    cmd = event.pattern_match.group(1)
-    if not cmd:
-        return await s_m_.edit("`What should i eval...`")
+async def evaluate(event):
+    """For .eval command, evaluates the given Python expression."""
+    expression = event.pattern_match.group(1)
+    if not expression:
+        return await event.edit("`Give an expression to evaluate.`")
 
+    if expression in ("userbot.session", "config.env"):
+        return await event.edit("`Itu operasi yang berbahaya! Tidak diperbolehkan!`")
+
+    await event.edit("`Processing...`")
     old_stderr = sys.stderr
     old_stdout = sys.stdout
-    redirected_output = sys.stdout = io.StringIO()
-    redirected_error = sys.stderr = io.StringIO()
-    stdout, stderr, exc = None, None, None
+    redirected_output = sys.stdout = StringIO()
+    redirected_error = sys.stderr = StringIO()
+    stdout, stderr, exc, returned = None, None, None, None
+
+    async def aexec(code, event):
+        head = "async def __aexec(event):\n "
+        code = "".join(f"\n {line}" for line in code.split("\n"))
+        exec(head + code)  # pylint: disable=exec-used
+        return await locals()["__aexec"](event)
 
     try:
-        returned = await aexec(cmd, s_m_)
-    except Exception:
-        exc = traceback.format_exc()
+        returned = await aexec(expression, event)
+    except Exception:  # pylint: disable=broad-except
+        exc = format_exc()
 
-    stdout = redirected_output.getvalue()
-    stderr = redirected_error.getvalue()
+    stdout = redirected_output.getvalue().strip()
+    stderr = redirected_error.getvalue().strip()
     sys.stdout = old_stdout
     sys.stderr = old_stderr
+    expression.encode("unicode-escape").decode().replace("\\\\", "\\")
 
-    evaluation = "No Output"
-    if exc:
-        evaluation = exc
-    elif stderr:
-        evaluation = stderr
-    elif stdout:
-        evaluation = stdout
-    elif returned:
-        evaluation = returned
-
-    final_output = "**EVAL**: \n`{}` \n\n**OUTPUT**: \n`{}` \n".format(
-        cmd, evaluation)
-
-    if len(final_output) >= 4096:
-        with io.BytesIO(str.encode(final_output)) as out_file:
-            out_file.name = "eval.txt"
-            await s_m_.reply(cmd, file=out_file)
-            await event.delete()
+    evaluation = str(exc or stderr or stdout or returned)
+    if evaluation and evaluation != "":
+        evaluation = evaluation.encode("unicode-escape").decode().replace("\\\\", "\\")
     else:
-        await s_m_.edit(final_output)
+        evaluation = "None"
 
-
-async def aexec(code, smessatatus):
-    message = event = smessatatus
-
-    reply = await event.get_reply_message()
-    exec(
-        f"async def __aexec(message, reply, client): "
-        + "\n event = smessatatus = message"
-        + "".join(f"\n {l}" for l in code.split("\n"))
-    )
-    return await locals()["__aexec"](message, reply, message.client)
+    if len(str(evaluation)) >= 4096:
+        with open("output.txt", "w+") as file:
+            file.write(evaluation)
+        await event.client.send_file(
+            event.chat_id,
+            "output.txt",
+            reply_to=event.id,
+            caption="`Output terlalu besar, dikirim sebagai file...`",
+        )
+        return remove("output.txt")
+    await event.edit(f"**Query:**\n`{expression}`\n\n**Result:**\n`{evaluation}`")
 
 
 @register(outgoing=True, pattern=r"^\.exec(?: |$|\n)([\s\S]*)")
-async def run(run_q):
+async def run(event):
     """For .exec command, which executes the dynamically created program"""
-    code = run_q.pattern_match.group(1)
-
-    if run_q.is_channel and not run_q.is_group:
-        return await run_q.edit("`Exec isn't permitted on channels!`")
-
+    code = event.pattern_match.group(1)
     if not code:
-        return await run_q.edit(
-            "``` At least a variable is required to"
-            "execute. Use .help exec for an example.```"
-        )
+        return await event.edit("**Read** `.help exec` **for an example.**")
 
     if code in ("userbot.session", "config.env"):
-        return await run_q.edit("`That's a dangerous operation! Not Permitted!`")
+        return await event.edit("`Itu operasi yang berbahaya! Tidak diperbolehkan!`")
 
+    await event.edit("`Processing...`")
     if len(code.splitlines()) <= 5:
         codepre = code
     else:
         clines = code.splitlines()
         codepre = (
-            clines[0] +
-            "\n" +
-            clines[1] +
-            "\n" +
-            clines[2] +
-            "\n" +
-            clines[3] +
-            "...")
+            clines[0] + "\n" + clines[1] + "\n" + clines[2] + "\n" + clines[3] + "..."
+        )
 
     command = "".join(f"\n {l}" for l in code.split("\n.strip()"))
     process = await asyncio.create_subprocess_exec(
-        executable,
+        sys.executable,
         "-c",
         command.strip(),
         stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
     )
-    stdout, stderr = await process.communicate()
-    result = str(stdout.decode().strip()) + str(stderr.decode().strip())
+    codepre.encode("unicode-escape").decode().replace("\\\\", "\\")
 
-    if result:
-        if len(result) > 4096:
-            file = open("output.txt", "w+")
-            file.write(result)
-            file.close()
-            await run_q.client.send_file(
-                run_q.chat_id,
-                "output.txt",
-                reply_to=run_q.id,
-                caption="`Output too large, sending as file`",
-            )
-            remove("output.txt")
-            return
-        await run_q.edit(
-            "**Query: **\n`" f"{codepre}" "`\n**Result: **\n`" f"{result}" "`"
-        )
+    stdout, _ = await process.communicate()
+    if stdout and stdout != "":
+        stdout = str(stdout.decode().strip())
+        stdout.encode("unicode-escape").decode().replace("\\\\", "\\")
     else:
-        await run_q.edit(
-            "**Query: **\n`" f"{codepre}" "`\n**Result: **\n`No result returned/False`"
+        stdout = "None"
+
+    if len(stdout) > 4096:
+        with open("output.txt", "w+") as file:
+            file.write(stdout)
+        await event.client.send_file(
+            event.chat_id,
+            "output.txt",
+            reply_to=event.id,
+            caption="`Output terlalu besar, dikirim sebagai file...`",
         )
+        return remove("output.txt")
+    await event.edit(f"**Query:**\n`{codepre}`\n\n**Result:**\n`{stdout}`")
 
 
-@register(outgoing=True, pattern=r"^\.term(?: |$|\n)(.*)")
-async def terminal_runner(term):
+@register(outgoing=True, pattern=r"^\.term(?: |$|\n)([\s\S]*)")
+async def terminal_runner(event):
     """For .term command, runs bash commands and scripts on your server."""
-    curruser = TERM_ALIAS if TERM_ALIAS else getuser()
-    command = term.pattern_match.group(1)
-    try:
-        from os import geteuid
-
-        uid = geteuid()
-    except ImportError:
-        uid = "This ain't it chief!"
-
-    if term.is_channel and not term.is_group:
-        return await term.edit("`Term commands aren't permitted on channels!`")
+    command = event.pattern_match.group(1)
 
     if not command:
-        return await term.edit(
-            "``` Give a command or use .help term for an example.```"
-        )
+        return await event.edit("`Give a command or use .help term for an example.`")
 
-    for i in ("userbot.session", "env"):
-        if command.find(i) != -1:
-            return await term.edit("`That's a dangerous operation! Not Permitted!`")
+    if command in ("userbot.session", "config.env"):
+        return await event.edit("`Itu operasi yang berbahaya! Tidak diperbolehkan!`")
 
-    if not re.search(r"echo[ \-\w]*\$\w+", command) is None:
-        return await term.edit("`That's a dangerous operation! Not Permitted!`")
-
+    await event.edit("`Processing...`")
     process = await asyncio.create_subprocess_shell(
-        command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        command, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT
     )
-    stdout, stderr = await process.communicate()
-    result = str(stdout.decode().strip()) + str(stderr.decode().strip())
+    command.encode("unicode-escape").decode().replace("\\\\", "\\")
+
+    stdout, _ = await process.communicate()
+    if stdout and stdout != "":
+        result = str(stdout.decode().strip())
+        result.encode("unicode-escape").decode().replace("\\\\", "\\")
+    else:
+        result = "None"
 
     if len(result) > 4096:
-        output = open("output.txt", "w+")
-        output.write(result)
-        output.close()
-        await term.client.send_file(
-            term.chat_id,
+        with open("output.txt", "w+") as output:
+            output.write(result)
+        await event.client.send_file(
+            event.chat_id,
             "output.txt",
-            reply_to=term.id,
-            caption="`Output too large, sending as file`",
+            reply_to=event.id,
+            caption="`Output terlalu besar, dikirim sebagai file...`",
         )
-        remove("output.txt")
+        return remove("output.txt")
+
+    await event.edit(f"**Command:**\n`{command}`\n\n**Result:**\n`{result}`")
+
+
+@register(outgoing=True, pattern="^.json$")
+async def _(event):
+    if event.fwd_from:
         return
-
-    if uid == 0:
-        await term.edit(f"`{curruser}:~# {command}\n{result}`")
+    the_real_message = None
+    reply_to_id = None
+    if event.reply_to_msg_id:
+        previous_message = await event.get_reply_message()
+        the_real_message = previous_message.stringify()
+        reply_to_id = event.reply_to_msg_id
     else:
-        await term.edit(f"`{curruser}:~$ {command}\n{result}`")
+        the_real_message = event.stringify()
+        reply_to_id = event.message.id
+    if len(the_real_message) > MAX_MESSAGE_SIZE_LIMIT:
+        with io.BytesIO(str.encode(the_real_message)) as out_file:
+            out_file.name = "json.text"
+            await bot.send_file(
+                event.chat_id,
+                out_file,
+                force_document=True,
+                allow_cache=False,
+                reply_to=reply_to_id,
+            )
+            await event.delete()
+    else:
+        await event.edit("`{}`".format(the_real_message))
 
 
-CMD_HELP.update({"eval": ">`.eval print('world')`"
-                 "\nUsage: Just like exec.", "exec": ">`.exec print('hello')`"
-                 "\nUsage: Execute small python scripts.", "term": ">`.term <cmd>`"
-                 "\nUsage: Run bash commands and scripts on your server.", })
+CMD_HELP.update(
+    {
+        "json": "**Plugin : **`json`\
+        \n\n  •  **Syntax :** `.json` <reply ke pesan>\
+        \n  •  **Function : **Untuk mendapatkan detail pesan dalam format json.\
+    "
+    }
+)
+
+
+CMD_HELP.update(
+    {
+        "eval": "**Plugin : **`eval`\
+        \n\n  •  **Syntax :** `.eval` <cmd>\
+        \n  •  **Function : **Evaluasi ekspresi Python dalam argumen skrip yang sedang berjalan\
+    "
+    }
+)
+
+
+CMD_HELP.update(
+    {
+        "exec": "**Plugin : **`exec`\
+        \n\n  •  **Syntax :** `.exec print('hello')`\
+        \n  •  **Function : **Jalankan skrip python kecil di subproses.\
+    "
+    }
+)
+
+
+CMD_HELP.update(
+    {
+        "term": "**Plugin : **`term`\
+        \n\n  •  **Syntax :** `.term` <cmd>\
+        \n  •  **Function : **Jalankan perintah dan skrip bash di server Anda.\
+    "
+    }
+)
