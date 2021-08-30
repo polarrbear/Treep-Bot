@@ -1,15 +1,7 @@
-# Copyright (C) 2020 Alfiananda P.A
-#
-# Licensed under the General Public License, Version 3.0;
-# you may not use this file except in compliance with the License.
-#
-
 import asyncio
 import os
 from asyncio.exceptions import TimeoutError
-
 from telethon.errors.rpcerrorlist import YouBlockedUserError
-
 from userbot import CMD_HELP, bot
 from userbot.events import register
 
@@ -18,8 +10,8 @@ from userbot.events import register
 async def _(event):
     try:
         query = event.pattern_match.group(1)
-        await event.edit("`Mohon Menunggu King Saya Sedang Mencari Wallpaper.....`")
-        async with bot.conversation("@SaitamaRobot") as conv:
+        await event.edit("`Please Wait Looking For Wallpaper.....`")
+        async with bot.conversation("@AnosVoldigoadBot") as conv:
             try:
                 query1 = await conv.send_message(f"/wall {query}")
                 asyncio.sleep(3)
