@@ -180,7 +180,7 @@ S_PACK_NAME = os.environ.get("S_PACK_NAME", None)
 
 # Default .alive logo
 ALIVE_LOGO = os.environ.get(
-    "ALIVE_LOGO") or "https://telegra.ph/file/9046e7a773c1694deda14.jpg"
+    "ALIVE_LOGO") or "https://telegra.ph/file/e10e15c5904e1438f80e9.jpg"
 
 # Last.fm Module
 BIO_PREFIX = os.environ.get("BIO_PREFIX", None)
@@ -424,7 +424,7 @@ with bot:
                         [
                             custom.Button.url(
                                 "Repositories",
-                                "https://github.com/ferikunn/Treep-Bot"),
+                                "https://github.com/polarrbear/Treep-Bot"),
                             custom.Button.url(
                                 "Pemilik",
                                 "t.me/xflicks")],
