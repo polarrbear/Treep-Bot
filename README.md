@@ -1,5 +1,5 @@
 # Treep Userbot
-![Treep-Userbot Logo](https://telegra.ph/file/9046e7a773c1694deda14.jpg)
+![Treep-Userbot Logo](https://telegra.ph/file/e10e15c5904e1438f80e9.jpg)
 
 
 
@@ -32,7 +32,7 @@ String_Session [Tekan](https://replit.com/@mrismanaziz/stringen?lite=1&outputonl
 ## <p align="center">DEPLOY Treep-Bot</p>
 
 
-<p align="center"><a href="https://heroku.com/deploy?template=https://github.com/ferikunn/Treep-Bot/tree/Treep-Bot"> <img src="https://img.shields.io/badge/Deploy%20Ke%20Heroku-magenta?style=flat&logo=heroku" width="210" height="34.45" /></a></p>
+<p align="center"><a href="https://heroku.com/deploy?template=https://github.com/ferikunn/polarrbear/tree/Treep-Bot"> <img src="https://img.shields.io/badge/Deploy%20Ke%20Heroku-magenta?style=flat&logo=heroku" width="210" height="34.45" /></a></p>
 
 <br>
 </p>
