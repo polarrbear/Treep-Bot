@@ -13,6 +13,17 @@ async def typewriter(typew):
     sleep(1)
     await typew.edit("`Tinggal Di Trenggalek, Salam Kenal:)`")
 
+@register(outgoing=True, pattern='^.dante(?: |$)(.*)')
+async def typewriter(typew):
+    typew.pattern_match.group(1)
+    sleep(3)
+    await typew.edit("`Hai Perkenalkan Namaku Dante`")
+    sleep(3)
+    await typew.edit("`16 Tahun`")
+    sleep(1)
+    await typew.edit("`Tinggal Di pulau seribu, Salam Kenal:)`")
+
+
 
 @register(outgoing=True, pattern='^ilyu(?: |$)(.*)')
 async def typewriter(typew):
